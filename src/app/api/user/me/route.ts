@@ -1,0 +1,38 @@
+import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { getSessionUser } from "@/lib/auth";
+
+export async function GET() {
+  try {
+    const user = await getSessionUser();
+    if (!user?.id) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
+    const c = await cookies();
+    const token = c.get("gv_session")?.value;
+
+    const BACKEND = process.env.NEXT_PUBLIC_BACKEND_BASE || "http://localhost:3001";
+
+    try {
+      const resp = await fetch(`${BACKEND}/user/by-id`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ userId: user.id }),
+      });
+
+      const body = await resp.json().catch(() => null);
+      return NextResponse.json(body, { status: resp.status });
+    } catch (err: any) {
+      console.error("Error proxying to backend /user/by-id:", err);
+      return NextResponse.json({ error: "Failed to contact backend" }, { status: 502 });
+    }
+  } catch (err: any) {
+    console.error("/api/user/me unexpected error:", err);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  }
+}

@@ -2,8 +2,6 @@
 import { NextResponse, NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 
-console.log('secret', process.env.AUTH_JWT_SECRET)
-
 const COOKIE_NAME = "gv_session"; // change to "gv_token" if you prefer
 const secret = new TextEncoder().encode(process.env.AUTH_JWT_SECRET);
 

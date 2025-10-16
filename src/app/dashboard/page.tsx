@@ -13,7 +13,7 @@ export default async function Page() {
   if (!user?.id) redirect("/login");
 
   const initialUser: Partial<Me> = {
-    id: user.id,
+    _id: user.id,
     username: user.username,
     plan: asPlan(user.plan),
   };

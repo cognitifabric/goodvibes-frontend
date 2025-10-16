@@ -8,23 +8,27 @@ type Action =
   | { type: "SET_SETS"; sets: SetDoc[] }
   | { type: "ADD_SET"; set: SetDoc }
   | { type: "UPDATE_SET"; set: SetDoc }
-  | { type: "REMOVE_SET"; id: string };
+  | { type: "REMOVE_SET"; id: string }
+  | { type: "LOGOUT" };
 
 const AppContext = createContext<{ state: State; dispatch: React.Dispatch<Action> } | null>(null);
 
-function reducer(state: State, action: Action): State {
+export function appReducer(state: State, action: Action): State {
   switch (action.type) {
     case "SET_ME": return { ...state, me: action.me };
     case "SET_SETS": return { ...state, sets: action.sets };
-    case "ADD_SET": return { ...state, sets: [action.set, ...state.sets] };
+    case "ADD_SET":
+      // append the new set so it appears at the bottom of the list
+      return { ...state, sets: [...state.sets, action.set] };
     case "UPDATE_SET": return { ...state, sets: state.sets.map(s => s._id === action.set._id ? action.set : s) };
     case "REMOVE_SET": return { ...state, sets: state.sets.filter(s => s._id !== action.id) };
+    case "LOGOUT": return { me: null, sets: [] };
     default: return state;
   }
 }
 
 export function AppProvider({ children, initial }: { children: React.ReactNode; initial?: Partial<State> }) {
-  const [state, dispatch] = useReducer(reducer, { me: null, sets: [], ...initial });
+  const [state, dispatch] = useReducer(appReducer, { me: null, sets: [], ...initial });
   return <AppContext.Provider value={{ state, dispatch }}>{children}</AppContext.Provider>;
 }
 

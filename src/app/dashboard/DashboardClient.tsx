@@ -1,19 +1,19 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { AppProvider, useApp } from "../_state/AppState";
+import { AppProvider, useApp } from "../_state/DashboardState";
 import useToast from "../_hooks/useToast";
-import { getMe, listSets, spotifyStart } from "@/lib/api";
+import { getMe, spotifyStart, getSpotifyStatus } from "@/lib/api";
 import CreateSetCard from "../_components/sets/CreateSetCard";
-import SetCard from "../_components/sets/SetCard";
+import SetRow from "../_components/sets/SetRow";
 import SpotifyBanner from "../_components/shared/SpotifyBanner";
 import { NeoBtn, NeoSurface } from "../_components/neo/Neo";
 import type { Me } from "@/lib/types";
 
 function DashboardInner({ initialUser }: { initialUser: Partial<Me> }) {
+
   const { state, dispatch } = useApp();
   const { ToastEl, setMsg } = useToast();
-  const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
 
   useEffect(() => {
@@ -23,54 +23,136 @@ function DashboardInner({ initialUser }: { initialUser: Partial<Me> }) {
     }
 
     (async () => {
-      try {
-        const [me, sets] = await Promise.all([getMe(), listSets()]);
-        dispatch({ type: "SET_ME", me });
-        dispatch({ type: "SET_SETS", sets });
-      } catch (e: any) {
-        if (e?.response?.status === 401) window.location.href = "/login";
-      } finally {
-        setLoading(false);
+      console.log("DashboardInner IIFE start - fetching me/sets");
+      // fetch authoritative user from backend via Next proxy
+      const meFromApi = await getMe().catch(() => null);
+
+      if (meFromApi) {
+        // set the fetched user object
+        dispatch({ type: "SET_ME", me: meFromApi });
+        // if the API returned sets, populate app state.sets as well
+        if (Array.isArray(meFromApi.sets)) {
+          dispatch({ type: "SET_SETS", sets: meFromApi.sets });
+        }
       }
+
+      // existing spotify callback handling / token-status logic can run here...
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const connectSpotify = async () => {
+  const connectSpotify = async (opts?: { showDialog?: boolean }) => {
     setConnecting(true);
     try {
-      const { authorizeUrl } = await spotifyStart();
+      // pass through option to the api helper (see api.ts change below)
+      const { authorizeUrl } = await spotifyStart(opts);
       window.location.href = authorizeUrl;
     } finally {
       setConnecting(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen app-auth-bg flex items-center justify-center p-6">
-        <NeoSurface>Loading…</NeoSurface>
-      </div>
-    );
-  }
-
   const me = state.me;
 
   return (
     <div className="min-h-screen app-auth-bg p-6">
-      <header className="max-w-6xl mx-auto mb-6 flex items-center justify-between">
-        <NeoSurface>
-          <h1 className="text-xl font-semibold">Dashboard</h1>
-          <p className="text-sm text-[var(--neo-muted)]">Manage your sets</p>
-        </NeoSurface>
-        <div className="flex items-center gap-2">
-          {me?.plan && <NeoSurface className="px-3 py-2">Plan: {me.plan}</NeoSurface>}
-          <a href="/logout" className="neo-btn">Log out</a>
+      <header className="max-w-6xl mx-auto mb-6">
+        <div className="neo-surface p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-green-400 to-teal-500 text-white shadow">
+              {/* simple logo mark */}
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M3 12a9 9 0 0118 0" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx="12" cy="12" r="2.2" />
+              </svg>
+            </div>
+            <div className="leading-tight min-w-0">
+              <h1 className="text-lg sm:text-xl font-semibold truncate">Dashboard</h1>
+              <p className="text-xs sm:text-sm text-[var(--neo-muted)] truncate">Manage your sets & Spotify integration</p>
+            </div>
+          </div>
+
+          <div className="flex-1 hidden sm:flex items-center justify-center px-4">
+            {/* optional center area - quick status */}
+            <div className="text-xs text-[var(--neo-muted)] bg-slate-50 px-3 py-1 rounded shadow-sm">
+              {me?.spotifyUserId ? "Spotify connected" : "Not connected to Spotify"}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 justify-end w-full sm:w-auto">
+            {/* unified small control style for plan / reconnect / member - consistent sizes */}
+            {me?.plan && (
+              <div className="flex items-center gap-2 h-10 px-3 rounded-md bg-white/95 shadow-sm text-sm min-w-[120px] text-slate-800">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-teal-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+                  <path d="M12 2v6l4 2" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M6 12v7a1 1 0 001 1h10a1 1 0 001-1v-7" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <span className="truncate font-medium">Plan: {me.plan}</span>
+              </div>
+            )}
+
+            {me?.spotifyUserId && (
+              <button
+                onClick={async () => {
+                  try {
+                    setConnecting(true);
+                    await connectSpotify({ showDialog: true }); // force re-consent
+                  } finally {
+                    setConnecting(false);
+                  }
+                }}
+                className="neo-btn h-10 flex items-center gap-2 px-3 text-slate-800 cursor-pointer"
+                title="Reconnect / reauthorize Spotify"
+                aria-label="Reconnect Spotify"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-spotify-green" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+                  <path d="M20 12a8 8 0 10-8 8" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M23 4v6h-6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <span className="hidden sm:inline font-medium">Reconnect</span>
+              </button>
+            )}
+
+            <div className="flex items-center gap-2 h-10">
+              <div className="flex items-center gap-3 h-10 px-3 rounded-md bg-white/95 shadow-sm">
+                <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-sm text-[var(--neo-muted)]">
+                  {me?.username?.charAt(0).toUpperCase() ?? "U"}
+                </div>
+                <div className="hidden md:flex flex-col leading-tight">
+                  <div className="text-sm font-medium truncate">{me?.username ?? "User"}</div>
+                  <div className="text-xs text-[var(--neo-muted)] truncate">Member</div>
+                </div>
+              </div>
+
+              <button
+                onClick={async () => {
+                  try {
+                    setConnecting(true);
+                    await (await import("@/lib/api")).logout();
+                    dispatch({ type: "LOGOUT" });
+                    window.location.href = "/login";
+                  } finally {
+                    setConnecting(false);
+                  }
+                }}
+                className="neo-btn h-12 w-12 flex items-center justify-center bg-[var(--color-tertiary)] hover:bg-[var(--color-tertiary-light)] text-white rounded-md cursor-pointer"
+                title="Log out"
+                aria-label="Log out"
+              >
+                {/* larger, higher-contrast icon for readability */}
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" aria-hidden="true">
+                  <path d="M16 17l5-5-5-5" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M21 12H9" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M9 19H5a2 2 0 01-2-2V7a2 2 0 012-2h4" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <span className="sr-only">Log out</span>
+              </button>
+            </div>
+          </div>
         </div>
       </header>
-
       <main className="max-w-6xl mx-auto space-y-6">
-        {!me?.spotifyLinked && <SpotifyBanner onConnect={connectSpotify} />}
+        {!me?.spotifyUserId && <SpotifyBanner onConnect={connectSpotify} />}
 
         <CreateSetCard onCreate={(s) => dispatch({ type: "ADD_SET", set: s })} />
 
@@ -82,14 +164,13 @@ function DashboardInner({ initialUser }: { initialUser: Partial<Me> }) {
               </p>
             </NeoSurface>
           ) : (
+            // render simple row layout for each set (newly created sets are appended to the end)
             state.sets.map((s) => (
-              <SetCard
+              <SetRow
                 key={s._id}
-                me={me!}
                 doc={s}
                 onChanged={(next) => dispatch({ type: "UPDATE_SET", set: next })}
                 onDeleted={(id) => dispatch({ type: "REMOVE_SET", id })}
-                canAddSongs={!!me?.spotifyLinked}
                 toast={setMsg}
               />
             ))
