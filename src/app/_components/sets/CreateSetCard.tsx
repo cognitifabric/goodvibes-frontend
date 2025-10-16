@@ -278,7 +278,7 @@ export default function CreateSetCard({ onCreate }: { onCreate: (s: SetDoc) => v
               </div>
             ) : (
               <div className="space-y-2">
-                <div className="flex gap-2">
+                <div className="flex gap-2 max-sm:flex-col max-sm:gap-y-2">
                   <NeoInput
                     placeholder="Search Spotify tracks"
                     value={query}

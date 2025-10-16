@@ -55,12 +55,12 @@ function DashboardInner({ initialUser }: { initialUser: Partial<Me> }) {
   const me = state.me;
 
   return (
-    <div className="min-h-screen app-auth-bg p-6">
-      <header className="max-w-6xl mx-auto mb-6">
-        <div className="neo-surface p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-green-400 to-teal-500 text-white shadow">
-              {/* simple logo mark */}
+    <div className="min-h-screen app-auth-bg px-4 sm:px-6 lg:px-8">
+      <header className="mx-auto mb-6 w-full max-w-5xl md:max-w-6xl">
+        <div className="neo-surface p-4 md:p-5 flex items-center flex-wrap gap-4 justify-between">
+          {/* left: logo + title (allow truncation) */}
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-green-400 to-teal-500 text-white shadow flex-shrink-0">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <path d="M3 12a9 9 0 0118 0" strokeLinecap="round" strokeLinejoin="round" />
                 <circle cx="12" cy="12" r="2.2" />
@@ -69,94 +69,108 @@ function DashboardInner({ initialUser }: { initialUser: Partial<Me> }) {
             <div className="leading-tight min-w-0">
               <h1 className="text-lg sm:text-xl font-semibold truncate">Dashboard</h1>
               <p className="text-xs sm:text-sm text-[var(--neo-muted)] truncate">Manage your sets & Spotify integration</p>
+              <div className="flex text-xs md:text-sm text-[var(--neo-muted)] bg-slate-50 px-3 py-1 rounded shadow-sm items-center gap-2 min-w-0 mt-2">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-green-500 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <path d="M9 12l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <span className="truncate">{me?.spotifyUserId ? "Spotify connected" : "Not connected to Spotify"}</span>
+              </div>
             </div>
           </div>
 
-          <div className="flex-1 hidden sm:flex items-center justify-center px-4">
-            {/* optional center area - quick status */}
-            <div className="text-xs text-[var(--neo-muted)] bg-slate-50 px-3 py-1 rounded shadow-sm">
-              {me?.spotifyUserId ? "Spotify connected" : "Not connected to Spotify"}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 justify-end w-full sm:w-auto">
-            {/* unified small control style for plan / reconnect / member - consistent sizes */}
-            {me?.plan && (
+          {/* right: controls - prevent shrinking so they stay visible */}
+          <div className="flex items-center gap-3 order-2 md:order-3 flex-shrink-0">
+             {/* unified small control style for plan / reconnect / member - consistent sizes */}
+             {me?.plan && (
               <div className="flex items-center gap-2 h-10 px-3 rounded-md bg-white/95 shadow-sm text-sm min-w-[120px] text-slate-800">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-teal-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
-                  <path d="M12 2v6l4 2" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M6 12v7a1 1 0 001 1h10a1 1 0 001-1v-7" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                <span className="truncate font-medium">Plan: {me.plan}</span>
-              </div>
-            )}
-
-            {me?.spotifyUserId && (
-              <button
-                onClick={async () => {
-                  try {
-                    setConnecting(true);
-                    await connectSpotify({ showDialog: true }); // force re-consent
-                  } finally {
-                    setConnecting(false);
-                  }
-                }}
+                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-teal-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+                   <path d="M12 2v6l4 2" strokeLinecap="round" strokeLinejoin="round" />
+                   <path d="M6 12v7a1 1 0 001 1h10a1 1 0 001-1v-7" strokeLinecap="round" strokeLinejoin="round" />
+                 </svg>
+                 <span className="truncate font-medium">Plan: {me.plan}</span>
+               </div>
+             )}
+ 
+             {me?.spotifyUserId && (
+               <button
+                 onClick={async () => {
+                   try {
+                     setConnecting(true);
+                     await connectSpotify({ showDialog: true }); // force re-consent
+                   } finally {
+                     setConnecting(false);
+                   }
+                 }}
                 className="neo-btn h-10 flex items-center gap-2 px-3 text-slate-800 cursor-pointer"
-                title="Reconnect / reauthorize Spotify"
-                aria-label="Reconnect Spotify"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-spotify-green" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
-                  <path d="M20 12a8 8 0 10-8 8" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M23 4v6h-6" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                <span className="hidden sm:inline font-medium">Reconnect</span>
-              </button>
-            )}
-
-            <div className="flex items-center gap-2 h-10">
-              <div className="flex items-center gap-3 h-10 px-3 rounded-md bg-white/95 shadow-sm">
-                <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-sm text-[var(--neo-muted)]">
-                  {me?.username?.charAt(0).toUpperCase() ?? "U"}
-                </div>
-                <div className="hidden md:flex flex-col leading-tight">
-                  <div className="text-sm font-medium truncate">{me?.username ?? "User"}</div>
-                  <div className="text-xs text-[var(--neo-muted)] truncate">Member</div>
-                </div>
-              </div>
-
-              <button
-                onClick={async () => {
-                  try {
-                    setConnecting(true);
-                    await (await import("@/lib/api")).logout();
-                    dispatch({ type: "LOGOUT" });
-                    window.location.href = "/login";
-                  } finally {
-                    setConnecting(false);
-                  }
-                }}
+                 title="Reconnect / reauthorize Spotify"
+                 aria-label="Reconnect Spotify"
+               >
+                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-spotify-green" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+                   <path d="M20 12a8 8 0 10-8 8" strokeLinecap="round" strokeLinejoin="round" />
+                   <path d="M23 4v6h-6" strokeLinecap="round" strokeLinejoin="round" />
+                 </svg>
+                 <span className="hidden sm:inline font-medium">Reconnect</span>
+               </button>
+             )}
+ 
+             <div className="flex items-center gap-2 h-10">
+               <div className="flex items-center gap-3 h-10 px-3 rounded-md bg-white/95 shadow-sm">
+                 <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-sm text-[var(--neo-muted)]">
+                   {me?.username?.charAt(0).toUpperCase() ?? "U"}
+                 </div>
+                 <div className="hidden md:flex flex-col leading-tight">
+                   <div className="text-sm font-medium truncate">{me?.username ?? "User"}</div>
+                   <div className="text-xs text-[var(--neo-muted)] truncate">Member</div>
+                 </div>
+               </div>
+ 
+               <button
+                 onClick={async () => {
+                   try {
+                     setConnecting(true);
+                     await (await import("@/lib/api")).logout();
+                     dispatch({ type: "LOGOUT" });
+                     window.location.href = "/login";
+                   } finally {
+                     setConnecting(false);
+                   }
+                 }}
                 className="neo-btn h-12 w-12 flex items-center justify-center bg-[var(--color-tertiary)] hover:bg-[var(--color-tertiary-light)] text-white rounded-md cursor-pointer"
-                title="Log out"
-                aria-label="Log out"
-              >
-                {/* larger, higher-contrast icon for readability */}
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" aria-hidden="true">
-                  <path d="M16 17l5-5-5-5" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M21 12H9" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M9 19H5a2 2 0 01-2-2V7a2 2 0 012-2h4" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                <span className="sr-only">Log out</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
-      <main className="max-w-6xl mx-auto space-y-6">
+                 title="Log out"
+                 aria-label="Log out"
+               >
+                 {/* larger, higher-contrast icon for readability */}
+                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" aria-hidden="true">
+                   <path d="M16 17l5-5-5-5" strokeLinecap="round" strokeLinejoin="round" />
+                   <path d="M21 12H9" strokeLinecap="round" strokeLinejoin="round" />
+                   <path d="M9 19H5a2 2 0 01-2-2V7a2 2 a0 012-2h4" strokeLinecap="round" strokeLinejoin="round" />
+                 </svg>
+                 <span className="sr-only">Log out</span>
+               </button>
+             </div>
+           </div>
+         </div>
+       </header>
+      <main className="mx-auto w-full max-w-5xl md:max-w-6xl space-y-6 pb-8">
         {!me?.spotifyUserId && <SpotifyBanner onConnect={connectSpotify} />}
 
-        <CreateSetCard onCreate={(s) => dispatch({ type: "ADD_SET", set: s })} />
+        <div className="flex items-center justify-between gap-4">
+          <CreateSetCard onCreate={(s) => dispatch({ type: "ADD_SET", set: s })} />
+          <div className="hidden sm:flex items-center gap-3">
+            <div className="text-xs text-[var(--neo-muted)]">Tip: click play on a set to replace Spotify playback</div>
+            <button className="neo-btn px-3 py-1 text-sm hidden md:inline-flex items-center gap-2 cursor-pointer" aria-label="Quick actions" title="Quick actions">
+              {/* use same icon/size/color as the Plan icon for better visibility */}
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-teal-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+                <path d="M12 2v6l4 2" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M6 12v7a1 1 0 001 1h10a1 1 0 001-1v-7" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span className="hidden lg:inline">Quick actions</span>
+            </button>
+          </div>
+        </div>
 
-        <section className="grid md:grid-cols-2 gap-6">
+        <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {state.sets.length === 0 ? (
             <NeoSurface>
               <p className="text-sm text-[var(--neo-muted)]">
@@ -164,7 +178,6 @@ function DashboardInner({ initialUser }: { initialUser: Partial<Me> }) {
               </p>
             </NeoSurface>
           ) : (
-            // render simple row layout for each set (newly created sets are appended to the end)
             state.sets.map((s) => (
               <SetRow
                 key={s._id}
@@ -177,10 +190,10 @@ function DashboardInner({ initialUser }: { initialUser: Partial<Me> }) {
           )}
         </section>
       </main>
-
-      {ToastEl}
-    </div>
-  );
+ 
+       {ToastEl}
+     </div>
+   );
 }
 
 export default function DashboardClient({ initialUser }: { initialUser: Partial<Me> }) {

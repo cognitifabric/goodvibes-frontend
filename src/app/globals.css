@@ -70,8 +70,8 @@ body {
   border-radius: 1.5rem;               /* rounded-3xl */
   padding: 2rem;                       /* p-8 */
   box-shadow:
-    9px 9px 16px var(--neo-shadow-dark),
-   -9px -9px 16px var(--neo-shadow-light);
+    7px 7px 14px var(--neo-shadow-dark),
+   -7px -7px 14px var(--neo-shadow-light);
 }
 
 /* Inset fields */

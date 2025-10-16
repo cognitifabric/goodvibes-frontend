@@ -39,6 +39,22 @@ export async function playTrack(trackId: string, deviceId?: string) {
   return res.data as any;
 }
 
+// Update set (wrapper expected by EditSetCard)
+export async function updateSet(payload: {
+  _id: string;
+  name?: string;
+  description?: string | null;
+  tags?: string[];
+}): Promise<SetDoc> {
+  const id = payload._id;
+  const patch: { name?: string; description?: string | null; tags?: string[] } = {};
+  if (typeof payload.name !== "undefined") patch.name = payload.name;
+  if (typeof payload.description !== "undefined") patch.description = payload.description;
+  if (typeof payload.tags !== "undefined") patch.tags = payload.tags;
+  const { data } = await http.patch(`/sets/${encodeURIComponent(id)}`, patch);
+  return data as SetDoc;
+}
+
 export async function updateSetBasic(id: string, patch: {
   name?: string; description?: string | null; tags?: string[];
 }): Promise<SetDoc> {
