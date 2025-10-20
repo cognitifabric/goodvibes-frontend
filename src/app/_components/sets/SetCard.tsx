@@ -1,96 +1,113 @@
 "use client";
-import React, { useEffect, useState } from "react";
-import { NeoBtn, NeoInput, NeoSurface } from "../neo/Neo";
-import SongsEditor from "./SongsEditor";
-import { addSongs, deleteSet, replaceSongs, updateSetBasic } from "@/lib/api";
-import { normTrackId, isSpotifyId } from "@/lib/utils";
-import type { Me, SetDoc } from "@/lib/types";
+import React, { useState } from "react";
+import { NeoSurface, NeoBtn } from "../neo/Neo";
+import type { SetDoc } from "@/lib/types";
+import EditSetCard from "./EditSetCard";
 
 export default function SetCard({
-  me, doc, onChanged, onDeleted, canAddSongs, toast,
+  setDoc,
+  onQueue,
+  onUpdated,
 }: {
-  me: Me | null;
-  doc: SetDoc;
-  onChanged: (s: SetDoc) => void;
-  onDeleted: (id: string) => void;
-  canAddSongs: boolean;
-  toast: (m: string) => void;
+  setDoc: SetDoc;
+  onQueue?: (ids: string[]) => Promise<void>;
+  onUpdated?: (next: SetDoc) => void;
 }) {
-  const [name, setName] = useState(doc.name);
-  const [desc, setDesc] = useState(doc.description || "");
-  const [songs, setSongs] = useState<string[]>(doc.songs || []);
-  const [adding, setAdding] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  useEffect(()=>{ setName(doc.name); setDesc(doc.description||""); setSongs(doc.songs||[]); }, [doc]);
-
-  async function saveDetails() {
-    setBusy(true);
-    try {
-      const updated = await updateSetBasic(doc._id, { name: name.trim()||doc.name, description: desc.trim() });
-      onChanged(updated); toast("Saved");
-    } finally { setBusy(false); }
-  }
-
-  async function saveOrder() {
-    setBusy(true);
-    try {
-      const out = await replaceSongs(doc._id, songs);
-      setSongs(out.songs);
-      onChanged({ ...doc, songs: out.songs });
-      toast(out.orderChanged ? "Order updated." : "No change.");
-    } finally { setBusy(false); }
-  }
-
-  async function add() {
-    if (!canAddSongs) { toast("Connect Spotify first."); return; }
-    const ids = adding.split(/[,\s]+/).map(normTrackId).filter(isSpotifyId);
-    if (!ids.length) { toast("Enter valid Spotify track IDs or URIs."); return; }
-    setBusy(true);
-    try {
-      const out = await addSongs(doc._id, ids);
-      setSongs(out.songs);
-      onChanged({ ...doc, songs: out.songs });
-      toast(out.skipped?.length ? `Added ${out.added}, skipped ${out.skipped.length}.` : `Added ${out.added}.`);
-      setAdding("");
-    } finally { setBusy(false); }
-  }
-
-  async function destroy() {
-    if (!confirm("Delete this set?")) return;
-    setBusy(true);
-    try { await deleteSet(doc._id); onDeleted(doc._id); toast("Set deleted."); }
-    finally { setBusy(false); }
-  }
+  const [showEdit, setShowEdit] = useState(false);
+  const images = setDoc.images ?? [];
+  const collage = images.slice(0, 4);
 
   return (
-    <NeoSurface>
-      <div className="flex items-start justify-between gap-3">
-        <div className="w-full">
-          <NeoInput value={name} onChange={e=>setName(e.target.value)} className="mb-2" />
-          <NeoInput value={desc} onChange={e=>setDesc(e.target.value)} placeholder="Description" />
+    <>
+      <NeoSurface className="relative p-4">
+        {/* top row: title + meta */}
+        <div className="flex items-start gap-4">
+          <div className="w-24 flex-shrink-0 grid grid-cols-2 gap-1">
+            {collage.length ? (
+              collage.map((src, i) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img key={i} src={src} alt={`${setDoc.name}-img-${i}`} className="w-11 h-11 object-cover rounded" />
+              ))
+            ) : (
+              <div className="w-24 h-24 rounded bg-slate-100 flex items-center justify-center text-xs text-[var(--neo-muted)]">No images</div>
+            )}
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-semibold truncate">{setDoc.name}</h3>
+                <div className="text-xs text-[var(--neo-muted)] mt-1 truncate">{setDoc.description ?? "No description"}</div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="text-xs text-[var(--neo-muted)] text-right">
+                  <div>{(setDoc.lovedBy || []).length} ❤️</div>
+                  <div>{(setDoc.collaborators || []).length} collaborators</div>
+                </div>
+
+                {/* play / queue - disabled if user not connected (handled in parent) */}
+                <NeoBtn
+                  title="Queue and play"
+                  aria-label="Queue and play"
+                  onClick={() => onQueue?.( (setDoc.songs || []).map(s => s.id) )}
+                  className="p-3 rounded-md bg-white border border-slate-200 hover:bg-slate-50"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-emerald-600" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M5 3v18l15-9L5 3z" />
+                  </svg>
+                </NeoBtn>
+              </div>
+            </div>
+
+            <div className="mt-3 flex items-center justify-between">
+              <div className="flex gap-2 flex-wrap">
+                {(setDoc.tags || []).slice(0, 6).map((t) => (
+                  <span key={t} className="text-xs px-2 py-1 bg-slate-100 rounded">#{t}</span>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-[var(--neo-muted)]">{new Date(setDoc.createdAt).toLocaleDateString()}</span>
+
+                {/* Edit placed top-right visually (open modal) */}
+                <NeoBtn
+                  onClick={() => setShowEdit(true)}
+                  className="p-2 rounded-md !bg-transparent !shadow-none"
+                  title="Edit set"
+                  aria-label="Edit set"
+                  style={{ boxShadow: "none" }}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-[var(--color-primary)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4 12.5-12.5z" />
+                  </svg>
+                </NeoBtn>
+              </div>
+            </div>
+          </div>
         </div>
-        <NeoBtn onClick={destroy} className={busy ? "opacity-60" : ""}>Delete</NeoBtn>
-      </div>
+      </NeoSurface>
 
-      <div className="divider"><span>songs</span></div>
-
-      <SongsEditor songs={songs} onChange={setSongs} />
-
-      <div className="mt-3 flex gap-2">
-        <NeoBtn onClick={saveOrder} className={busy ? "opacity-60" : ""}>Save order</NeoBtn>
-        <NeoBtn onClick={saveDetails} className={busy ? "opacity-60" : ""}>Save details</NeoBtn>
-      </div>
-
-      <div className="mt-4 flex gap-2">
-        <NeoInput
-          className="flex-1"
-          placeholder="Paste Spotify track IDs or URIs (comma/space separated)"
-          value={adding}
-          onChange={e=>setAdding(e.target.value)}
-        />
-        <NeoBtn onClick={add} className={busy ? "opacity-60" : ""}>Add</NeoBtn>
-      </div>
-    </NeoSurface>
+      {showEdit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowEdit(false)} />
+          <div className="relative w-full max-w-2xl max-h-[calc(100vh-72px)] overflow-auto">
+            <EditSetCard
+              initialSet={setDoc}
+              onSave={(next) => {
+                setShowEdit(false);
+                onUpdated?.(next);
+              }}
+              onDelete={() => {
+                setShowEdit(false);
+                // parent can refresh list by listening to events; implement if needed
+              }}
+              onCancel={() => setShowEdit(false)}
+            />
+          </div>
+        </div>
+      )}
+    </>
   );
 }

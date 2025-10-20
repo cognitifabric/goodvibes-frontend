@@ -6,7 +6,13 @@ import { useApp } from "../../_state/DashboardState";
 import type { SetDoc } from "@/lib/types";
 import useToast from "../../_hooks/useToast";
 
-export default function CreateSetCard({ onCreate }: { onCreate: (s: SetDoc) => void }) {
+export default function CreateSetCard({
+  onCreate,
+  connectSpotify,
+}: {
+  onCreate: (s: SetDoc) => void;
+  connectSpotify?: () => void; // <- added optional prop
+}) {
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
   const [tags, setTags] = useState("");
@@ -224,12 +230,6 @@ export default function CreateSetCard({ onCreate }: { onCreate: (s: SetDoc) => v
   }
   function removeTrack(id: string) {
     setPending((p) => p.filter((x) => x.id !== id));
-  }
-
-  async function connectSpotify() {
-    // reuse existing api helper
-    const { authorizeUrl } = await spotifyStart();
-    window.location.href = authorizeUrl;
   }
 
   // drag handlers for reorder mode (simple HTML5 DnD)

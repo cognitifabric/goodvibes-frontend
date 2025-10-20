@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { NeoBtn, NeoInput, NeoSurface } from "../neo/Neo";
 import type { SetDoc } from "@/lib/types";
-import { updateSet, deleteSet, addSongs } from "@/lib/api";
+import { updateSetFull, deleteSet, addSongs } from "@/lib/api";
 import useToast from "../../_hooks/useToast";
 import { spotifyStart } from "@/lib/api"; // reuse spotify connect helper
 import { useApp } from "../../_state/DashboardState";
@@ -77,6 +77,7 @@ export default function EditSetCard({
   }
 
   function addTrack(t: any) {
+    console.log(t)
     if (!pending.find((p) => p.id === t.id)) setPending((p) => [...p, t]);
   }
   function removeTrack(id: string) {
@@ -120,56 +121,31 @@ export default function EditSetCard({
     }
     setBusy(true);
     try {
-      // update metadata
-      const metaPayload = {
-        _id: initialSet._id,
+      const payload = {
         name: name.trim(),
         description: desc.trim() || null,
         tags: tags.split(",").map((s) => s.trim()).filter(Boolean),
+        // send full songs array (service will map/validate)
+        songs: pending.map((s) => ({ id: s.id, title: s.title, artists: s.artists, image: s.image })),
       };
-      const updatedMeta = await updateSet(metaPayload);
 
-      // compute song diffs
-      const originalIds = (initialSet.songs || []).map((s: any) => s.id);
-      const newIds = pending.map((s) => s.id);
+      // Use single atomic API to update metadata + songs
+      const updated = await updateSetFull(initialSet._id, payload);
 
-      const toAdd = newIds.filter((id) => !originalIds.includes(id));
-      const toRemove = originalIds.filter((id) => !newIds.includes(id));
-
-      // add new songs (API handles duplicates)
-      if (toAdd.length) {
-        try {
-          await addSongs(initialSet._id, toAdd);
-        } catch (err) {
-          console.warn("addSongs failed", err);
-          // non-fatal: continue
-        }
-      }
-
-      // remove songs via API (best-effort). Call public endpoint /sets/:id/songs/remove
-      if (toRemove.length) {
-        try {
-          await fetch(`/api/sets/${encodeURIComponent(initialSet._id)}/songs/remove`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Accept: "application/json" },
-            credentials: "include",
-            body: JSON.stringify({ songs: toRemove }),
-          });
-        } catch (err) {
-          console.warn("remove songs failed", err);
-        }
-      }
-
-      // Build updated set doc for UI
-      const images = pending.map((t) => t.image).filter(Boolean).slice(0, 5);
+      // Build updated set doc for UI (server returns updated set)
+      const pendingImages = pending.map((t) => t.image).filter(Boolean).slice(0, 5);
+      const images =
+        updated.images ??
+        (pendingImages.length ? pendingImages : (initialSet.images ?? []));
+      
       const updatedDoc: SetDoc = {
         ...initialSet,
-        _id: initialSet._id,
-        name: updatedMeta.name ?? name.trim(),
-        description: typeof updatedMeta.description !== "undefined" ? updatedMeta.description : desc,
-        tags: tags.split(",").map((s) => s.trim()).filter(Boolean),
-        songs: pending,
-        images: images.length ? images : initialSet.images ?? [],
+        _id: updated._id ?? initialSet._id,
+        name: updated.name ?? payload.name,
+        description: typeof updated.description !== "undefined" ? updated.description : payload.description,
+        tags: updated.tags ?? payload.tags,
+        songs: updated.songs ?? payload.songs,
+        images,
       };
 
       onSave?.(updatedDoc);

@@ -10,6 +10,8 @@ import SpotifyBanner from "../_components/shared/SpotifyBanner";
 import { NeoBtn, NeoSurface } from "../_components/neo/Neo";
 import type { Me } from "@/lib/types";
 
+function sleep(ms: number) { return new Promise((r) => setTimeout(r, ms)); }
+
 function DashboardInner({ initialUser }: { initialUser: Partial<Me> }) {
 
   const { state, dispatch } = useApp();
@@ -17,45 +19,59 @@ function DashboardInner({ initialUser }: { initialUser: Partial<Me> }) {
   const [connecting, setConnecting] = useState(false);
 
   useEffect(() => {
-    // seed minimal user from server (id/username/plan), then fetch full /me
     if (initialUser) {
-      dispatch({ type: "SET_ME", me: { ...state.me, ...initialUser } as Me });
+      dispatch({ type: "SET_ME", me: { ...(state.me ?? {}), ...initialUser } as Me });
     }
 
     (async () => {
-      console.log("DashboardInner IIFE start - fetching me/sets");
-      // fetch authoritative user from backend via Next proxy
       const meFromApi = await getMe().catch(() => null);
-
       if (meFromApi) {
-        // set the fetched user object
         dispatch({ type: "SET_ME", me: meFromApi });
-        // if the API returned sets, populate app state.sets as well
-        if (Array.isArray(meFromApi.sets)) {
-          dispatch({ type: "SET_SETS", sets: meFromApi.sets });
-        }
+        if (Array.isArray(meFromApi.sets)) dispatch({ type: "SET_SETS", sets: meFromApi.sets });
       }
 
-      // existing spotify callback handling / token-status logic can run here...
+      // Immediately query token status and update me.spotifyUserId accordingly
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const connectSpotify = async (opts?: { showDialog?: boolean }) => {
-    setConnecting(true);
+  async function connectSpotify(options?: { showDialog?: boolean }) {
     try {
-      // pass through option to the api helper (see api.ts change below)
-      const { authorizeUrl } = await spotifyStart(opts);
-      window.location.href = authorizeUrl;
-    } finally {
-      setConnecting(false);
+      const res = await fetch("/api/account/authorize/spotify", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ showDialog: options?.showDialog ?? true }),
+      });
+
+      // If backend returned JSON (isXhr path) it'll include authorizeUrl
+      const json = await res.json().catch(() => ({} as any));
+      if (json && json.authorizeUrl) {
+        // client-side redirect to Spotify authorize page
+        window.location.href = json.authorizeUrl;
+        return;
+      }
+
+      // Fallback: if backend did a redirect (rare for XHR) try to read Location header
+      const location = res.headers?.get?.("location");
+      if (location) {
+        window.location.href = location;
+        return;
+      }
+
+      // Show friendly error toast
+      const errMsg = json?.error ?? `Spotify authorize failed (status ${res.status})`;
+      window.dispatchEvent(new CustomEvent("queuevibes:toast", { detail: errMsg }));
+    } catch (err: any) {
+      console.error("connectSpotify error", err);
+      window.dispatchEvent(new CustomEvent("queuevibes:toast", { detail: err?.message ?? "Connect failed" }));
     }
-  };
+  }
 
   const me = state.me;
 
   return (
-    <div className="min-h-screen app-auth-bg px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen app-auth-bg px-4 pt-10 sm:px-6 lg:px-8">
       <header className="mx-auto mb-6 w-full max-w-5xl md:max-w-6xl">
         <div className="neo-surface p-4 md:p-5 flex items-center flex-wrap gap-4 justify-between">
           {/* left: logo + title (allow truncation) */}
@@ -110,7 +126,18 @@ function DashboardInner({ initialUser }: { initialUser: Partial<Me> }) {
                    <path d="M20 12a8 8 0 10-8 8" strokeLinecap="round" strokeLinejoin="round" />
                    <path d="M23 4v6h-6" strokeLinecap="round" strokeLinejoin="round" />
                  </svg>
-                 <span className="hidden sm:inline font-medium">Reconnect</span>
+                 <span 
+                  className="hidden sm:inline font-medium"
+                  onClick={async () => {
+                    try {
+                      setConnecting(true);
+                      await connectSpotify({ showDialog: true }); // force re-consent
+                    } finally {
+                      setConnecting(false);
+                    }
+                  }}
+                 >Reconnect
+                 </span>
                </button>
              )}
  
@@ -125,29 +152,7 @@ function DashboardInner({ initialUser }: { initialUser: Partial<Me> }) {
                  </div>
                </div>
  
-               <button
-                 onClick={async () => {
-                   try {
-                     setConnecting(true);
-                     await (await import("@/lib/api")).logout();
-                     dispatch({ type: "LOGOUT" });
-                     window.location.href = "/login";
-                   } finally {
-                     setConnecting(false);
-                   }
-                 }}
-                className="neo-btn h-12 w-12 flex items-center justify-center bg-[var(--color-tertiary)] hover:bg-[var(--color-tertiary-light)] text-white rounded-md cursor-pointer"
-                 title="Log out"
-                 aria-label="Log out"
-               >
-                 {/* larger, higher-contrast icon for readability */}
-                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" aria-hidden="true">
-                   <path d="M16 17l5-5-5-5" strokeLinecap="round" strokeLinejoin="round" />
-                   <path d="M21 12H9" strokeLinecap="round" strokeLinejoin="round" />
-                   <path d="M9 19H5a2 2 0 01-2-2V7a2 2 a0 012-2h4" strokeLinecap="round" strokeLinejoin="round" />
-                 </svg>
-                 <span className="sr-only">Log out</span>
-               </button>
+               
              </div>
            </div>
          </div>
@@ -156,7 +161,7 @@ function DashboardInner({ initialUser }: { initialUser: Partial<Me> }) {
         {!me?.spotifyUserId && <SpotifyBanner onConnect={connectSpotify} />}
 
         <div className="flex items-center justify-between gap-4">
-          <CreateSetCard onCreate={(s) => dispatch({ type: "ADD_SET", set: s })} />
+          <CreateSetCard onCreate={(s) => dispatch({ type: "ADD_SET", set: s })} connectSpotify={connectSpotify} />
           <div className="hidden sm:flex items-center gap-3">
             <div className="text-xs text-[var(--neo-muted)]">Tip: click play on a set to replace Spotify playback</div>
             <button className="neo-btn px-3 py-1 text-sm hidden md:inline-flex items-center gap-2 cursor-pointer" aria-label="Quick actions" title="Quick actions">
@@ -185,6 +190,7 @@ function DashboardInner({ initialUser }: { initialUser: Partial<Me> }) {
                 onChanged={(next) => dispatch({ type: "UPDATE_SET", set: next })}
                 onDeleted={(id) => dispatch({ type: "REMOVE_SET", id })}
                 toast={setMsg}
+                onConnect={connectSpotify}
               />
             ))
           )}

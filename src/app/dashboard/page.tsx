@@ -16,6 +16,8 @@ export default async function Page() {
     _id: user.id,
     username: user.username,
     plan: asPlan(user.plan),
+    // include spotifyUserId so client shows "connected" immediately after server render
+    spotifyUserId: (user as any).spotifyUserId ?? undefined,
   };
 
   return <DashboardClient initialUser={initialUser} />;

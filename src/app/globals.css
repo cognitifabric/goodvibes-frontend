@@ -3,7 +3,7 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
-  --color-primary: #7C3AED;
+  --color-primary: #1BC47F;
   --color-secondary: #22D3EE;
   --color-tertiary: #0F172A;
   --color-fourth: #F8FAFC;
@@ -13,6 +13,16 @@
   --color-primary-light: #A78BFA;
   --color-secondary-light: #67E8F9;
   --color-tertiary-light: #1E293B;
+
+  /* adjust value to match the rendered nav height (including padding) */
+  --nav-height: 72px;
+}
+
+/* optional responsive tweaks */
+@media (min-width: 768px) {
+  :root {
+    --nav-height: 80px;
+  }
 }
 
 @theme inline {
@@ -21,13 +31,6 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
-
-/* @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-} */
 
 /* ---------- Neumorphism Tokens ---------- */
 :root {

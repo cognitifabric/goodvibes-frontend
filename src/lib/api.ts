@@ -7,6 +7,26 @@ import type { Me, SetDoc } from "./types";
 const API = process.env.NEXT_PUBLIC_BACKEND_BASE || "/api";
 const http = axios.create({ withCredentials: true, baseURL: API });
 
+// emit a friendly toast event on any axios error (non-blocking)
+http.interceptors.response.use(
+  (r) => r,
+  (error) => {
+    try {
+      const status = error?.response?.status;
+      let msg = "Request failed";
+      if (status === 401) msg = "Please sign in to continue.";
+      else if (error?.response?.data?.error) msg = error.response.data.error;
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("queuevibes:toast", { detail: msg }));
+      }
+    } catch (e) {
+      // ignore
+    }
+    return Promise.reject(error);
+  }
+);
+
+
 export async function createSet(payload: {
   name: string;
   description?: string | null;
@@ -15,28 +35,62 @@ export async function createSet(payload: {
   // accept song objects now
   songs?: { id: string; title: string; artists?: string; image?: string }[];
   images?: string[];
-}): Promise<SetDoc> {
+}) {
   // force calling Next proxy to include session cookie
-  const res = await axios.post("/api/sets/create", payload, { withCredentials: true });
-  return res.data as SetDoc;
+  try {
+    const res = await http.post("/sets/create", payload);
+    return res.data as SetDoc;
+  } catch (err: any) {
+    console.log(err);
+    throw err; // <<— ensure we rethrow so the function never implicitly returns undefined
+  }
 }
 
 // Queue a single track (or small batch if you pass multiple). This posts to the Next proxy
 // which forwards the session to the backend.
-export async function queueTracks(trackIds: string[], deviceId?: string, playFirst?: boolean, replace?: boolean) {
+export async function queueTracks(trackIds: string[], deviceId?: string, playFirst?: boolean, replace?: boolean): Promise<any> {
+  try {
+    const resp = await fetch("/api/spotify/queue", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ trackIds, deviceId, playFirst, replace }),
+    });
 
-  const res = await axios.post(
-    "/api/spotify/queue",
-    { trackIds, deviceId, playFirst, replace },
-    { withCredentials: true }
-  );
-  return res.data as any;
+    const body = await resp.json().catch(() => ({}));
+
+    // throw for non-2xx so the catch block below handles user messaging
+    if (!resp.ok) {
+      const msg = body?.error ?? `Status ${resp.status}`;
+      const err = new Error(String(msg));
+      (err as any).response = body;
+      throw err;
+    }
+
+    return body;
+  } catch (err: any) {
+    const msg = err?.message ?? "Failed to queue tracks";
+    try {
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("queuevibes:toast", { detail: String(msg) }));
+      }
+    } catch (e) {
+      /* ignore toast failure */
+    }
+    // rethrow so callers can still handle the error if needed
+    throw err;
+  }
 }
 
 // Play a single track immediately (wrapper for backend /account/spotify/play)
-export async function playTrack(trackId: string, deviceId?: string) {
-  const res = await axios.post("/api/spotify/play", { trackId, deviceId }, { withCredentials: true });
-  return res.data as any;
+export async function playTrack(trackId: string, deviceId?: string): Promise<any> {
+  try {
+    const res = await http.post("/spotify/play", { trackId, deviceId }, { withCredentials: true });
+    return res.data as any;
+  } catch (err: any) {
+    console.log(err);
+    throw err;
+  }
 }
 
 // Update set (wrapper expected by EditSetCard)
@@ -93,7 +147,16 @@ export async function spotifyStart(opts?: { showDialog?: boolean }) {
 }
 
 export async function logout(): Promise<void> {
-  await http.post("/user/auth/logout");
+  const res = await fetch("/api/user/auth/logout", {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({}),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body?.error ?? `Logout failed: ${res.status}`);
+  }
 }
 
 export async function getSpotifyStatus(): Promise<{ profile?: any; tokenInfo?: { expiresAt?: number } | null } | null> {
@@ -123,4 +186,20 @@ export async function getMe(): Promise<Me | null> {
   } catch (err) {
     return null;
   }
+}
+
+export async function updateSetFull(setId: string, payload: { name?: string; description?: string | null; tags?: string[]; songs?: any[] }) {
+  const res = await fetch(`/api/sets/${encodeURIComponent(setId)}/full`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    credentials: "include",
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    const err = new Error(body?.error?.message ?? body?.error ?? `Status ${res.status}`);
+    (err as any).response = body;
+    throw err;
+  }
+  return res.json();
 }

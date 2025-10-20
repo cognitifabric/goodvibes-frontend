@@ -26,6 +26,35 @@ export async function GET() {
       });
 
       const body = await resp.json().catch(() => null);
+
+      // If we successfully fetched the user, also check backend Spotify token status.
+      // If tokens are missing/invalid, clear spotifyUserId so frontend shows "not connected".
+      if (resp.ok && body) {
+        try {
+          const spotifyRes = await fetch(`${BACKEND}/account/spotify/me`, {
+            method: "GET",
+            headers: {
+              Accept: "application/json",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+          });
+          const spotifyBody = await spotifyRes.json().catch(() => null);
+          // If spotify endpoint returns tokenInfo, mark connected and ensure spotifyUserId is set.
+          if (spotifyRes.ok && spotifyBody && spotifyBody.tokenInfo) {
+            body.spotifyConnected = true;
+            body.spotifyUserId = spotifyBody.profile?.id ?? body.spotifyUserId;
+          } else {
+            // no tokens => not connected
+            body.spotifyConnected = false;
+            body.spotifyUserId = undefined;
+          }
+        } catch (e) {
+          // on error, be conservative: treat as not connected
+          body.spotifyConnected = false;
+          body.spotifyUserId = undefined;
+        }
+      }
+
       return NextResponse.json(body, { status: resp.status });
     } catch (err: any) {
       console.error("Error proxying to backend /user/by-id:", err);
