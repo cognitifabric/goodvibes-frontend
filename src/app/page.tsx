@@ -103,7 +103,7 @@ export default function HomePageV5() {
 
             {/* CTA Buttons */}
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.3 }} className="flex flex-wrap items-center justify-center gap-4 mb-16">
-              <button className="group relative px-8 py-4 rounded-2xl text-white overflow-hidden" style={{ background: "linear-gradient(135deg, var(--color-primary), var(--color-secondary))", boxShadow: "0 8px 24px rgba(124, 58, 237, 0.3)" }}>
+              <button onClick={() => (window.location.href = "/dashboard")} className="group relative px-8 py-4 rounded-2xl text-white overflow-hidden" style={{ background: "linear-gradient(135deg, var(--color-primary), var(--color-secondary))", boxShadow: "0 8px 24px rgba(124, 58, 237, 0.3)" }}>
                 <span className="relative z-10 flex items-center gap-2">
                   Start Creating
                   <Sparkles className="w-5 h-5 group-hover:rotate-12 transition-transform" />

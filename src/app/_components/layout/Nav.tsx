@@ -172,7 +172,7 @@ export default function Nav({
                 <a href="#pricing" className="transition-colors hover:opacity-80 cursor-pointer" style={{ color: "var(--neo-text)" }} onClick={() => setMobileMenuOpen(false)}>
                   Pricing
                 </a>
-                <a href="#sets" className="transition-colors hover:opacity-80 cursor-pointer" style={{ color: "var(--neo-text)" }} onClick={() => setMobileMenuOpen(false)}>
+                <a href="/sets" className="transition-colors hover:opacity-80 cursor-pointer" style={{ color: "var(--neo-text)" }} onClick={() => setMobileMenuOpen(false)}>
                   Sets
                 </a>
 
