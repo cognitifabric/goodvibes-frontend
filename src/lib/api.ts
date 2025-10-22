@@ -1,11 +1,30 @@
 import axios from "axios";
 import type { Me, SetDoc } from "./types";
 
-// Use Next.js proxy (/api) by default so browser sends gv_session cookie to same origin.
-// If you want to call backend directly (cross-origin), set NEXT_PUBLIC_BACKEND_BASE to a full backend URL
-// and make sure backend CORS allows credentials and the cookie is set for that origin.
-const API = process.env.NEXT_PUBLIC_BACKEND_BASE || "/api";
-const http = axios.create({ withCredentials: true, baseURL: API });
+// explicit distinction:
+// - BACKEND is the absolute backend host when set (e.g. "https://api.auraandvibes.com/api" or "http://localhost:3001/api")
+// - PROXY is the Next.js app-route prefix (same-origin) used from the browser: "/api"
+const BACKEND = process.env.NEXT_PUBLIC_BACKEND_BASE || "";
+const PROXY = "/api";
+
+// axios instance should target the Next proxy by default so axios calls use same-origin cookies
+const http = axios.create({ withCredentials: true, baseURL: PROXY });
+
+// helper to build backend absolute URL when you intentionally want to call the backend host
+function backendUrl(path: string) {
+  if (!path.startsWith("/")) path = "/" + path;
+  if (BACKEND && (BACKEND.startsWith("http://") || BACKEND.startsWith("https://"))) {
+    return BACKEND.replace(/\/$/, "") + path;
+  }
+  // fallback: call proxy path if no BACKEND configured
+  return PROXY + path;
+}
+
+// helper to build proxy (Next API) URL (always same-origin)
+function proxyUrl(path: string) {
+  if (!path.startsWith("/")) path = "/" + path;
+  return PROXY + path;
+}
 
 // emit a friendly toast event on any axios error (non-blocking)
 http.interceptors.response.use(
@@ -32,25 +51,23 @@ export async function createSet(payload: {
   description?: string | null;
   tags?: string[];
   collaborators?: string[];
-  // accept song objects now
-  songs?: { id: string; title: string; artists?: string; image?: string }[];
+  songs?: { id: string; title?: string; artists?: string; image?: string }[];
   images?: string[];
 }) {
-  // force calling Next proxy to include session cookie
   try {
+    // use Next proxy to include session cookie
     const res = await http.post("/sets/create", payload);
     return res.data as SetDoc;
   } catch (err: any) {
     console.log(err);
-    throw err; // <<— ensure we rethrow so the function never implicitly returns undefined
+    throw err;
   }
 }
 
-// Queue a single track (or small batch if you pass multiple). This posts to the Next proxy
-// which forwards the session to the backend.
 export async function queueTracks(trackIds: string[], deviceId?: string, playFirst?: boolean, replace?: boolean): Promise<any> {
   try {
-    const resp = await fetch("/api/spotify/queue", {
+    // MUST call Next proxy so same-origin cookie/session is sent
+    const resp = await fetch(proxyUrl("/spotify/queue"), {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -59,7 +76,6 @@ export async function queueTracks(trackIds: string[], deviceId?: string, playFir
 
     const body = await resp.json().catch(() => ({}));
 
-    // throw for non-2xx so the catch block below handles user messaging
     if (!resp.ok) {
       const msg = body?.error ?? `Status ${resp.status}`;
       const err = new Error(String(msg));
@@ -77,23 +93,30 @@ export async function queueTracks(trackIds: string[], deviceId?: string, playFir
     } catch (e) {
       /* ignore toast failure */
     }
-    // rethrow so callers can still handle the error if needed
     throw err;
   }
 }
 
-// Play a single track immediately (wrapper for backend /account/spotify/play)
 export async function playTrack(trackId: string, deviceId?: string): Promise<any> {
   try {
-    const res = await http.post("/spotify/play", { trackId, deviceId }, { withCredentials: true });
-    return res.data as any;
+    // call Next proxy so session cookie is included
+    const res = await fetch(proxyUrl("/spotify/play"), {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ trackId, deviceId }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body?.error ?? `Status ${res.status}`);
+    }
+    return await res.json();
   } catch (err: any) {
     console.log(err);
     throw err;
   }
 }
 
-// Update set (wrapper expected by EditSetCard)
 export async function updateSet(payload: {
   _id: string;
   name?: string;
@@ -109,9 +132,7 @@ export async function updateSet(payload: {
   return data as SetDoc;
 }
 
-export async function updateSetBasic(id: string, patch: {
-  name?: string; description?: string | null; tags?: string[];
-}): Promise<SetDoc> {
+export async function updateSetBasic(id: string, patch: { name?: string; description?: string | null; tags?: string[] }): Promise<SetDoc> {
   const { data } = await http.patch(`/sets/${id}`, patch);
   return data;
 }
@@ -131,9 +152,7 @@ export async function deleteSet(id: string) {
 }
 
 export async function spotifyStart(opts?: { showDialog?: boolean }) {
-  // call the Next proxy route which lives at /api/spotify/start (route.ts uses GET)
-  const path = `/api/spotify/start${opts?.showDialog ? "?showDialog=true" : ""}`;
-
+  const path = proxyUrl(`/spotify/start${opts?.showDialog ? "?showDialog=true" : ""}`);
   const resp = await fetch(path, {
     method: "GET",
     credentials: "include",
@@ -147,7 +166,7 @@ export async function spotifyStart(opts?: { showDialog?: boolean }) {
 }
 
 export async function logout(): Promise<void> {
-  const res = await fetch("/api/user/auth/logout", {
+  const res = await fetch(proxyUrl("/user/auth/logout"), {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -161,7 +180,8 @@ export async function logout(): Promise<void> {
 
 export async function getSpotifyStatus(): Promise<{ profile?: any; tokenInfo?: { expiresAt?: number } | null } | null> {
   try {
-    const res = await fetch(`${API}/account/spotify/me`, {
+    // check via Next proxy so session is forwarded and backend can validate tokens
+    const res = await fetch(proxyUrl("/account/spotify/me"), {
       method: "GET",
       credentials: "include",
       headers: { Accept: "application/json" },
@@ -173,10 +193,10 @@ export async function getSpotifyStatus(): Promise<{ profile?: any; tokenInfo?: {
   }
 }
 
-// Fetch current user via Next proxy that forwards the session to backend
 export async function getMe(): Promise<Me | null> {
   try {
-    const res = await fetch(`/api/user/me`, {
+    // ALWAYS call Next proxy /api/user/me from the browser so cookies are sent to Next server
+    const res = await fetch(proxyUrl("/user/me"), {
       method: "GET",
       credentials: "include",
       headers: { Accept: "application/json" },
@@ -189,7 +209,7 @@ export async function getMe(): Promise<Me | null> {
 }
 
 export async function updateSetFull(setId: string, payload: { name?: string; description?: string | null; tags?: string[]; songs?: any[] }) {
-  const res = await fetch(`/api/sets/${encodeURIComponent(setId)}/full`, {
+  const res = await fetch(proxyUrl(`/sets/${encodeURIComponent(setId)}/full`), {
     method: "PATCH",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     credentials: "include",
