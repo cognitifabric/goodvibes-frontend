@@ -60,8 +60,6 @@ export default function SetRow({
   async function handleQueueAll() {
     // ensure authenticated first
     const authed = await isAuthenticated();
-
-    console.log("auth", authed)
     
     if (!authed) {
       const msg = "Please sign in to play sets";
@@ -73,8 +71,6 @@ export default function SetRow({
 
     // ensure Spotify tokens exist before making queue request
     const hasTokens = await hasSpotifyTokens();
-
-    console.log('tokens', hasTokens)
     
     if (!hasTokens) {
       // show modal to prompt connect
@@ -139,6 +135,7 @@ export default function SetRow({
       window.location.href = "/dashboard";
     }
   };
+  
 
   return (
     <>

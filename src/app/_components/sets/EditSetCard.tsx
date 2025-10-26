@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { NeoBtn, NeoInput, NeoSurface } from "../neo/Neo";
 import type { SetDoc } from "@/lib/types";
 import { updateSetFull, deleteSet, addSongs } from "@/lib/api";
@@ -33,6 +33,7 @@ export default function EditSetCard({
   // reorder state
   const [reorderMode, setReorderMode] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
+  const touchInfoRef = useRef<{ id: string | null; identifier: number | null }>({ id: null, identifier: null });
 
   useEffect(() => {
     // keep local pending synced if initialSet changes externally
@@ -77,7 +78,6 @@ export default function EditSetCard({
   }
 
   function addTrack(t: any) {
-    console.log(t)
     if (!pending.find((p) => p.id === t.id)) setPending((p) => [...p, t]);
   }
   function removeTrack(id: string) {
@@ -120,23 +120,25 @@ export default function EditSetCard({
       return;
     }
     setBusy(true);
+    
     try {
+
+      const images = pending
+        .map((t) => t.image)
+        .filter(Boolean) // remove falsy
+        .slice(0, 5);
+      
       const payload = {
         name: name.trim(),
         description: desc.trim() || null,
         tags: tags.split(",").map((s) => s.trim()).filter(Boolean),
         // send full songs array (service will map/validate)
         songs: pending.map((s) => ({ id: s.id, title: s.title, artists: s.artists, image: s.image })),
+        ...(images.length ? { images } : {}),
       };
 
       // Use single atomic API to update metadata + songs
       const updated = await updateSetFull(initialSet._id, payload);
-
-      // Build updated set doc for UI (server returns updated set)
-      const pendingImages = pending.map((t) => t.image).filter(Boolean).slice(0, 5);
-      const images =
-        updated.images ??
-        (pendingImages.length ? pendingImages : (initialSet.images ?? []));
       
       const updatedDoc: SetDoc = {
         ...initialSet,
@@ -156,6 +158,7 @@ export default function EditSetCard({
     } finally {
       setBusy(false);
     }
+
   }
 
   async function handleDelete() {
@@ -171,6 +174,60 @@ export default function EditSetCard({
       setBusy(false);
     }
   }
+
+  // Touch-based drag-to-reorder handlers (mobile)
+  function handleTouchStart(e: React.TouchEvent, id: string) {
+    // prevent native gestures interfering with reorder start
+    e.stopPropagation();
+    const t = e.changedTouches[0];
+    touchInfoRef.current = { id, identifier: t.identifier };
+    setDragId(id);
+  }
+
+  useEffect(() => {
+    function onTouchMove(e: TouchEvent) {
+      const info = touchInfoRef.current;
+      if (!info.id || info.identifier == null) return;
+      const touch = Array.from(e.changedTouches).find((c) => c.identifier === info.identifier);
+      if (!touch) return;
+      const el = document.elementFromPoint(touch.clientX, touch.clientY) as HTMLElement | null;
+      const li = el?.closest("li[data-track-id]") as HTMLElement | null;
+      if (!li) return;
+      const overId = li.getAttribute("data-track-id");
+      if (!overId || overId === info.id) return;
+
+      // perform reorder similar to handleDragOver
+      setPending((prev) => {
+        const fromIdx = prev.findIndex((x) => x.id === info.id);
+        const toIdx = prev.findIndex((x) => x.id === overId);
+        if (fromIdx === -1 || toIdx === -1) return prev;
+        const next = [...prev];
+        const [item] = next.splice(fromIdx, 1);
+        next.splice(toIdx, 0, item);
+        return next;
+      });
+      // update current id position
+      touchInfoRef.current.id = overId;
+    }
+
+    function onTouchEnd() {
+      touchInfoRef.current = { id: null, identifier: null };
+      setDragId(null);
+    }
+
+    window.addEventListener("touchmove", onTouchMove, { passive: true });
+    window.addEventListener("touchend", onTouchEnd);
+    window.addEventListener("touchcancel", onTouchEnd);
+    return () => {
+      window.removeEventListener("touchmove", onTouchMove);
+      window.removeEventListener("touchend", onTouchEnd);
+      window.removeEventListener("touchcancel", onTouchEnd);
+    };
+  }, []);
+
+  // useEffect(() => {
+  //   console.log(pending)
+  // }, [pending])
 
   return (
     <NeoSurface className="p-0">
@@ -319,6 +376,7 @@ export default function EditSetCard({
                                   onDragStart={(e) => handleDragStart(e, t.id)}
                                   onDragOver={(e) => handleDragOver(e, t.id)}
                                   onDragEnd={handleDropEnd}
+                                  onTouchStart={(e) => handleTouchStart(e, t.id)}
                                   className="flex items-center justify-between px-2 py-2 rounded bg-slate-50/50 hover:bg-slate-100 cursor-grab"
                                 >
                                   <div className="flex items-center gap-3">
@@ -333,7 +391,11 @@ export default function EditSetCard({
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-3">
-                                    <div className="text-xs text-[var(--neo-muted)]">drag</div>
+                                    <div className="text-xs text-[var(--neo-muted)]" aria-hidden="true" title="Drag to reorder">
+                                      <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                        <path d="M7 7a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm0 5a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm0 5a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm5-10a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm0 5a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm0 5a1.5 1.5 0 110 3 1.5 1.5 0 010-3z" />
+                                      </svg>
+                                    </div>
                                     <NeoBtn type="button" className={`p-2`} aria-label="Play track">
                                       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="inline-block">
                                         <path d="M3 22v-20l18 10-18 10z" />
