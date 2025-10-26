@@ -6,6 +6,9 @@ import { updateSetFull, deleteSet, addSongs } from "@/lib/api";
 import useToast from "../../_hooks/useToast";
 import { spotifyStart } from "@/lib/api"; // reuse spotify connect helper
 import { useApp } from "../../_state/DashboardState";
+import { DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 export default function EditSetCard({
   initialSet,
@@ -229,6 +232,67 @@ export default function EditSetCard({
   //   console.log(pending)
   // }, [pending])
 
+  // DnD-kit Sortable item component (local)
+  function SortableItem({ item }: { item: any }) {
+    const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: item.id });
+    const style: React.CSSProperties = {
+      transform: transform ? CSS.Transform.toString(transform) : undefined,
+      transition,
+      touchAction: "manipulation", // allow good mobile interactions
+    };
+    return (
+      <li
+        ref={setNodeRef}
+        {...attributes}
+        {...listeners}
+        data-track-id={item.id}
+        className="flex items-center justify-between px-2 py-2 rounded bg-slate-50/50 hover:bg-slate-100 cursor-grab"
+        style={style}
+      >
+        <div className="flex items-center gap-3">
+          {item.image ? (
+            <img src={item.image} alt={item.title} className="w-10 h-10 rounded object-cover" />
+          ) : (
+            <div className="w-10 h-10 rounded bg-slate-100 flex items-center justify-center text-xs text-[var(--neo-muted)]">No</div>
+          )}
+          <div>
+            <div className="font-medium">{item.title}</div>
+            <div className="text-[var(--neo-muted)] text-xs">{item.artists}</div>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="text-xs text-[var(--neo-muted)]" aria-hidden="true" title="Drag to reorder">
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M7 7a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm0 5a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm0 5a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm5-10a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm0 5a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm0 5a1.5 1.5 0 110 3 1.5 1.5 0 010-3z" />
+            </svg>
+          </div>
+          <NeoBtn type="button" className={`p-2`} aria-label="Play track">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="inline-block">
+              <path d="M3 22v-20l18 10-18 10z" />
+            </svg>
+          </NeoBtn>
+        </div>
+      </li>
+    );
+  }
+
+  // sensors for pointer + touch (touch activation distance helps avoid long-press)
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(TouchSensor, { activationConstraint: { distance: 5 } })
+  );
+
+  function handleDndEnd(event: any) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setPending((prev) => {
+      const oldIndex = prev.findIndex((p) => p.id === active.id);
+      const newIndex = prev.findIndex((p) => p.id === over.id);
+      if (oldIndex === -1 || newIndex === -1) return prev;
+      return arrayMove(prev, oldIndex, newIndex);
+    });
+  }
+
   return (
     <NeoSurface className="p-0">
       {/* make form a column with a scrollable content area and a sticky footer */}
@@ -368,43 +432,15 @@ export default function EditSetCard({
                         <div className="border rounded p-2 bg-white">
                           <div className="text-sm text-[var(--neo-muted)] mb-2">Drag to reorder tracks</div>
                           <div className="max-h-[40vh] overflow-y-auto">
-                            <ul className="space-y-1">
-                              {pending.map((t) => (
-                                <li
-                                  key={t.id}
-                                  draggable
-                                  onDragStart={(e) => handleDragStart(e, t.id)}
-                                  onDragOver={(e) => handleDragOver(e, t.id)}
-                                  onDragEnd={handleDropEnd}
-                                  onTouchStart={(e) => handleTouchStart(e, t.id)}
-                                  className="flex items-center justify-between px-2 py-2 rounded bg-slate-50/50 hover:bg-slate-100 cursor-grab"
-                                >
-                                  <div className="flex items-center gap-3">
-                                    {t.image ? (
-                                      <img src={t.image} alt={t.title} className="w-10 h-10 rounded object-cover" />
-                                    ) : (
-                                      <div className="w-10 h-10 rounded bg-slate-100 flex items-center justify-center text-xs text-[var(--neo-muted)]">No</div>
-                                    )}
-                                    <div>
-                                      <div className="font-medium">{t.title}</div>
-                                      <div className="text-[var(--neo-muted)] text-xs">{t.artists}</div>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-3">
-                                    <div className="text-xs text-[var(--neo-muted)]" aria-hidden="true" title="Drag to reorder">
-                                      <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                                        <path d="M7 7a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm0 5a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm0 5a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm5-10a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm0 5a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm0 5a1.5 1.5 0 110 3 1.5 1.5 0 010-3z" />
-                                      </svg>
-                                    </div>
-                                    <NeoBtn type="button" className={`p-2`} aria-label="Play track">
-                                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="inline-block">
-                                        <path d="M3 22v-20l18 10-18 10z" />
-                                      </svg>
-                                    </NeoBtn>
-                                  </div>
-                                </li>
-                              ))}
-                            </ul>
+                            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDndEnd}>
+                              <SortableContext items={pending.map((p) => p.id)} strategy={verticalListSortingStrategy}>
+                                <ul className="space-y-1">
+                                  {pending.map((t) => (
+                                    <SortableItem key={t.id} item={t} />
+                                  ))}
+                                </ul>
+                              </SortableContext>
+                            </DndContext>
                           </div>
                           <div className="mt-2 flex gap-2">
                             <NeoBtn type="button" onClick={saveOrderAndClose}>Save order</NeoBtn>
