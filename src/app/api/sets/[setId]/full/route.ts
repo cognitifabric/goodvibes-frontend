@@ -1,44 +1,52 @@
+import { NextRequest } from "next/server";
+
 export async function PATCH(req: Request, context: any) {
-  // Accept any for the route context to handle Next versions/type differences.
-  const params = (context && (context.params ?? (context as any).params)) || {};
-  const { setId } = (params as { setId?: string }) || {};
+  // Accept a flexible route context to satisfy Next's typing differences across versions.
+  // context.params may be a Promise in some Next versions — await it safely.
+  const params = (await (context && (context.params ?? (context as any).params))) || {};
+  const setId = String((params as { setId?: string }).setId ?? "");
+
   if (!setId) {
     return new Response(JSON.stringify({ error: "Missing setId parameter" }), {
       status: 400,
       headers: { "content-type": "application/json" },
     });
   }
+
   const backendBase =
     process.env.NEXT_PUBLIC_BACKEND_BASE || process.env.BACKEND_URL || "http://localhost:3001/api";
   const backendUrl = `${backendBase.replace(/\/$/, "")}/sets/${encodeURIComponent(setId)}/full`;
 
   try {
     const body = await req.json().catch(() => ({}));
+
+    // forward incoming request cookies so backend can authenticate
     const cookieHeader = req.headers.get("cookie") || "";
 
-    // extract gv_session cookie value (if present) and use it as Bearer token
-    let bearerToken: string | null = null;
-    if (cookieHeader) {
-      const parts = cookieHeader.split(";").map((p) => p.trim());
-      const kv = parts.find((p) => p.startsWith("gv_session="));
-      if (kv) {
-        bearerToken = decodeURIComponent(kv.split("=")[1] || "");
-      }
+    // if gv_session cookie exists, forward it as an Authorization bearer token too
+    let authHeader: string | undefined;
+    try {
+      const cookies = cookieHeader
+        .split(";")
+        .map((c) => c.trim())
+        .filter(Boolean);
+      const gv = cookies.map((c) => {
+        const [k, ...v] = c.split("=");
+        return { k: k?.trim(), v: v?.join("=") };
+      }).find((x) => x.k === "gv_session")?.v;
+      if (gv) authHeader = `Bearer ${gv}`;
+    } catch (e) {
+      /* ignore parse errors */
     }
-
-    const forwardHeaders: Record<string, string> = {
-      "content-type": "application/json",
-      accept: "application/json",
-    };
-
-    // forward cookie as well (best-effort)
-    if (cookieHeader) forwardHeaders["cookie"] = cookieHeader;
-    // pass gv_session as Authorization Bearer so backend AuthMiddleware can validate
-    if (bearerToken) forwardHeaders["authorization"] = `Bearer ${bearerToken}`;
 
     const backendRes = await fetch(backendUrl, {
       method: "PATCH",
-      headers: forwardHeaders,
+      headers: {
+        "content-type": "application/json",
+        accept: "application/json",
+        ...(authHeader ? { Authorization: authHeader } : {}),
+        cookie: cookieHeader,
+      },
       body: JSON.stringify(body),
     });
 
