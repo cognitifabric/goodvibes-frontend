@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { BACKEND } from "@/lib/backend";
+const BACKEND = process.env.BACKEND_URL ?? "https://goodvibes-backend-production.up.railway.app";
 
 export async function GET(req: NextRequest) {
   const cookieHeader = req.headers.get("cookie") || "";
