@@ -6,29 +6,35 @@ export default function HomePage() {
   return (
     <div className="min-h-screen" style={{ background: "var(--background)" }}>
       {/* Nav */}
-      <nav className="fixed top-0 left-0 right-0 z-50 px-6 py-4 flex items-center justify-between border-b border-white/5 backdrop-blur-sm bg-black/20">
-        <div className="flex items-center gap-2">
+      <nav className="fixed top-0 left-0 right-0 z-50 px-4 sm:px-6 py-3 flex items-center justify-between border-b border-white/5 backdrop-blur-sm bg-black/20">
+        <a href="/" className="flex items-center gap-2 flex-shrink-0">
           <div className="w-8 h-8 rounded-lg bg-green-500 flex items-center justify-center">
             <Music className="w-4 h-4 text-black" />
           </div>
-          <span className="text-white font-semibold text-lg">GoodVibes</span>
-        </div>
-        <div className="flex items-center gap-3">
+          <span className="text-white font-semibold text-base sm:text-lg">GoodVibes</span>
+        </a>
+        <div className="flex items-center gap-2 sm:gap-3">
           <a
             href="/sets"
-            className="text-gray-400 hover:text-white text-sm transition-colors"
+            className="hidden sm:block text-gray-400 hover:text-white text-sm transition-colors"
           >
             Browse Sets
           </a>
           <a
             href="/login"
-            className="text-gray-400 hover:text-white text-sm transition-colors"
+            className="hidden sm:block text-gray-400 hover:text-white text-sm transition-colors"
           >
             Sign in
           </a>
           <a
+            href="/sets"
+            className="sm:hidden text-gray-400 hover:text-white text-sm transition-colors"
+          >
+            Sets
+          </a>
+          <a
             href="/signup"
-            className="bg-green-500 hover:bg-green-400 text-black font-semibold rounded-xl px-4 py-2 text-sm transition-colors"
+            className="bg-green-500 hover:bg-green-400 text-black font-semibold rounded-xl px-3 sm:px-4 py-2 text-sm transition-colors whitespace-nowrap"
           >
             Get started
           </a>

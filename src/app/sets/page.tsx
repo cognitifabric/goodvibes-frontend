@@ -271,24 +271,27 @@ export default function SetsPage() {
   return (
     <div className="min-h-screen" style={{ background: "var(--background)" }}>
       {/* Nav */}
-      <nav className="fixed top-0 left-0 right-0 z-40 h-16 flex items-center justify-between px-4 md:px-8 border-b border-white/5"
+      <nav className="fixed top-0 left-0 right-0 z-40 h-14 flex items-center justify-between px-4 sm:px-8 border-b border-white/5"
         style={{ background: "rgba(10,10,15,0.85)", backdropFilter: "blur(12px)" }}>
-        <a href="/" className="flex items-center gap-2.5">
+        <a href="/" className="flex items-center gap-2 flex-shrink-0">
           <div className="w-8 h-8 rounded-lg bg-green-500 flex items-center justify-center">
             <Music className="w-4 h-4 text-black" />
           </div>
-          <span className="text-white font-semibold text-lg tracking-tight">GoodVibes</span>
+          <span className="text-white font-semibold text-base tracking-tight">GoodVibes</span>
         </a>
-        <div className="flex items-center gap-3">
-          <a href="/sets" className="text-green-400 text-sm font-medium">Sets</a>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <span className="text-green-400 text-sm font-medium hidden sm:block">Sets</span>
           {isLoggedIn ? (
-            <a href="/dashboard" className="bg-green-500 hover:bg-green-400 text-black font-semibold rounded-xl px-4 py-2 text-sm transition-colors">
+            <a href="/dashboard" className="bg-green-500 hover:bg-green-400 text-black font-semibold rounded-xl px-3 sm:px-4 py-2 text-sm transition-colors">
               Dashboard
             </a>
           ) : (
-            <a href="/login" className="bg-green-500 hover:bg-green-400 text-black font-semibold rounded-xl px-4 py-2 text-sm transition-colors">
-              Sign in
-            </a>
+            <>
+              <a href="/login" className="hidden sm:block text-gray-400 hover:text-white text-sm transition-colors">Sign in</a>
+              <a href="/signup" className="bg-green-500 hover:bg-green-400 text-black font-semibold rounded-xl px-3 sm:px-4 py-2 text-sm transition-colors whitespace-nowrap">
+                Get started
+              </a>
+            </>
           )}
         </div>
       </nav>

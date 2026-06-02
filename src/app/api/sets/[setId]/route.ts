@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const BACKEND = process.env.BACKEND_URL || "http://localhost:3001";
+import { BACKEND } from "@/lib/backend";
 
 export async function PATCH(
   req: NextRequest,
