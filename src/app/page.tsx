@@ -15,6 +15,12 @@ export default function HomePage() {
         </div>
         <div className="flex items-center gap-3">
           <a
+            href="/sets"
+            className="text-gray-400 hover:text-white text-sm transition-colors"
+          >
+            Browse Sets
+          </a>
+          <a
             href="/login"
             className="text-gray-400 hover:text-white text-sm transition-colors"
           >

@@ -23,6 +23,11 @@ export default function Nav({ me }: { me: Me | null }) {
         <span className="text-white font-semibold text-lg tracking-tight">GoodVibes</span>
       </a>
 
+      {/* Center nav links */}
+      <div className="hidden sm:flex items-center gap-6">
+        <a href="/sets" className="text-gray-400 hover:text-white text-sm transition-colors">Sets</a>
+      </div>
+
       {/* Right */}
       {me && (
         <div className="flex items-center gap-3">
