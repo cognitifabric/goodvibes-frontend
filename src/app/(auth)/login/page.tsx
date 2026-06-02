@@ -9,7 +9,20 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    const params = new URLSearchParams(window.location.search);
+    const e = params.get("error");
+    if (!e) return null;
+    const msgs: Record<string, string> = {
+      missing_params: "OAuth failed: missing parameters.",
+      invalid_state: "OAuth session expired. Please try again.",
+      token_exchange_failed: "Could not connect to Spotify. Please try again.",
+      profile_fetch_failed: "Could not load Spotify profile. Please try again.",
+      login_failed: "Login failed. Please try again.",
+    };
+    return msgs[e] ?? decodeURIComponent(e);
+  });
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
