@@ -1,8 +1,28 @@
 "use client";
 import React, { useState, FormEvent } from "react";
-import { Music, CheckCircle } from "lucide-react";
+import { Music, CheckCircle, Check, X } from "lucide-react";
 import GoogleOAuthButton from "@/app/_components/shared/GoogleOAuthButton";
 import SpotifyLoginButton from "@/app/_components/shared/SpotifyLoginButton";
+
+function PasswordStrength({ password }: { password: string }) {
+  const rules = [
+    { label: "At least 8 characters", ok: password.length >= 8 },
+    { label: "One uppercase letter", ok: /[A-Z]/.test(password) },
+    { label: "One lowercase letter", ok: /[a-z]/.test(password) },
+    { label: "One number", ok: /[0-9]/.test(password) },
+  ];
+  if (!password) return null;
+  return (
+    <ul className="mt-2 space-y-1">
+      {rules.map((r) => (
+        <li key={r.label} className={`flex items-center gap-1.5 text-xs ${r.ok ? "text-green-400" : "text-gray-500"}`}>
+          {r.ok ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
+          {r.label}
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 export default function SignupPage() {
   const [firstName, setFirstName] = useState("");
@@ -12,12 +32,15 @@ export default function SignupPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [success, setSuccess] = useState(false);
+  const [successMsg, setSuccessMsg] = useState("");
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setFieldErrors({});
 
     try {
       const res = await fetch("/api/user/auth/signup", {
@@ -30,11 +53,22 @@ export default function SignupPage() {
       const data = await res.json().catch(() => ({}));
 
       if (res.status === 201 || res.ok) {
+        setSuccessMsg(data?.next || "Account created!");
         setSuccess(true);
         return;
       }
 
-      setError(data?.error ?? data?.message ?? "Signup failed. Please try again.");
+      // Parse Zod validation issues into per-field errors
+      if (data?.error === "ValidationError" && Array.isArray(data.issues)) {
+        const errs: Record<string, string> = {};
+        data.issues.forEach((issue: { path: string; message: string }) => {
+          if (!errs[issue.path]) errs[issue.path] = issue.message;
+        });
+        setFieldErrors(errs);
+        setError("Please fix the errors below.");
+      } else {
+        setError(data?.error ?? data?.message ?? "Signup failed. Please try again.");
+      }
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {
@@ -43,6 +77,7 @@ export default function SignupPage() {
   }
 
   if (success) {
+    const isAutoVerified = successMsg === "Account created! You can sign in now.";
     return (
       <div
         className="min-h-screen flex items-center justify-center px-4"
@@ -53,17 +88,19 @@ export default function SignupPage() {
             <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center mx-auto">
               <CheckCircle className="w-8 h-8 text-green-400" />
             </div>
-            <h2 className="text-2xl font-bold text-white">Check your email</h2>
+            <h2 className="text-2xl font-bold text-white">
+              {isAutoVerified ? "You're all set!" : "Check your email"}
+            </h2>
             <p className="text-gray-400 text-sm leading-relaxed">
-              We sent a verification link to{" "}
-              <span className="text-white font-medium">{email}</span>.
-              Click the link to activate your account.
+              {isAutoVerified
+                ? "Your account has been created. Sign in to start curating."
+                : <>We sent a verification link to{" "}<span className="text-white font-medium">{email}</span>. Click the link to activate your account.</>}
             </p>
             <a
               href="/login"
               className="inline-block w-full bg-green-500 hover:bg-green-400 text-black font-semibold rounded-xl px-5 py-2.5 text-sm transition-colors mt-2"
             >
-              Back to sign in
+              {isAutoVerified ? "Sign in now" : "Back to sign in"}
             </a>
           </div>
         </div>
@@ -71,12 +108,13 @@ export default function SignupPage() {
     );
   }
 
+  const fe = fieldErrors;
+
   return (
     <div
       className="min-h-screen flex items-center justify-center px-4 py-12"
       style={{ background: "var(--background)" }}
     >
-      {/* Ambient glow */}
       <div
         className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 rounded-full blur-3xl opacity-10 pointer-events-none"
         style={{ background: "var(--color-primary)" }}
@@ -96,17 +134,15 @@ export default function SignupPage() {
         </div>
 
         {/* Card */}
-        <div className="glass rounded-2xl p-6 space-y-5">
-          {error && (
+        <div className="glass rounded-2xl p-6 space-y-4">
+          {error && !Object.keys(fieldErrors).length && (
             <div className="bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl px-4 py-3 text-sm">
               {error}
             </div>
           )}
 
-          {/* Spotify signup */}
+          {/* Social login */}
           <SpotifyLoginButton label="Sign up with Spotify" />
-
-          {/* Google OAuth */}
           <GoogleOAuthButton onError={setError} />
 
           {/* Divider */}
@@ -116,78 +152,65 @@ export default function SignupPage() {
             <div className="flex-1 h-px bg-white/10" />
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm text-gray-400 mb-1.5">First name</label>
+                <label className="block text-xs text-gray-400 mb-1">First name</label>
                 <input
-                  type="text"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  required
-                  placeholder="Jane"
-                  autoComplete="given-name"
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50 transition-colors text-sm"
+                  type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)}
+                  required placeholder="Jane" autoComplete="given-name"
+                  className={`w-full bg-white/5 border rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none transition-colors text-sm ${fe.firstName ? "border-red-500/50" : "border-white/10 focus:border-green-500/50"}`}
                 />
+                {fe.firstName && <p className="text-red-400 text-xs mt-1">{fe.firstName}</p>}
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1.5">Last name</label>
+                <label className="block text-xs text-gray-400 mb-1">Last name</label>
                 <input
-                  type="text"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  required
-                  placeholder="Doe"
-                  autoComplete="family-name"
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50 transition-colors text-sm"
+                  type="text" value={lastName} onChange={(e) => setLastName(e.target.value)}
+                  required placeholder="Doe" autoComplete="family-name"
+                  className={`w-full bg-white/5 border rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none transition-colors text-sm ${fe.lastName ? "border-red-500/50" : "border-white/10 focus:border-green-500/50"}`}
                 />
+                {fe.lastName && <p className="text-red-400 text-xs mt-1">{fe.lastName}</p>}
               </div>
             </div>
 
             <div>
-              <label className="block text-sm text-gray-400 mb-1.5">Username</label>
+              <label className="block text-xs text-gray-400 mb-1">Username</label>
               <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                required
-                placeholder="janedoe"
-                autoComplete="username"
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50 transition-colors text-sm"
+                type="text" value={username} onChange={(e) => setUsername(e.target.value)}
+                required placeholder="janedoe" autoComplete="username"
+                className={`w-full bg-white/5 border rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none transition-colors text-sm ${fe.username ? "border-red-500/50" : "border-white/10 focus:border-green-500/50"}`}
               />
+              {fe.username
+                ? <p className="text-red-400 text-xs mt-1">{fe.username}</p>
+                : <p className="text-gray-600 text-xs mt-1">Letters, numbers, . _ - only</p>}
             </div>
 
             <div>
-              <label className="block text-sm text-gray-400 mb-1.5">Email</label>
+              <label className="block text-xs text-gray-400 mb-1">Email</label>
               <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                placeholder="you@example.com"
-                autoComplete="email"
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50 transition-colors text-sm"
+                type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                required placeholder="you@example.com" autoComplete="email"
+                className={`w-full bg-white/5 border rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none transition-colors text-sm ${fe.email ? "border-red-500/50" : "border-white/10 focus:border-green-500/50"}`}
               />
+              {fe.email && <p className="text-red-400 text-xs mt-1">{fe.email}</p>}
             </div>
 
             <div>
-              <label className="block text-sm text-gray-400 mb-1.5">Password</label>
+              <label className="block text-xs text-gray-400 mb-1">Password</label>
               <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={8}
-                placeholder="Min. 8 characters"
+                type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+                required minLength={8} placeholder="Min. 8 chars, uppercase, number"
                 autoComplete="new-password"
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50 transition-colors text-sm"
+                className={`w-full bg-white/5 border rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none transition-colors text-sm ${fe.password ? "border-red-500/50" : "border-white/10 focus:border-green-500/50"}`}
               />
+              <PasswordStrength password={password} />
+              {fe.password && <p className="text-red-400 text-xs mt-1">{fe.password}</p>}
             </div>
 
             <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-green-500 hover:bg-green-400 disabled:opacity-60 disabled:cursor-not-allowed text-black font-semibold rounded-xl px-5 py-2.5 text-sm transition-colors flex items-center justify-center gap-2"
+              type="submit" disabled={loading}
+              className="w-full bg-green-500 hover:bg-green-400 disabled:opacity-60 disabled:cursor-not-allowed text-black font-semibold rounded-xl px-5 py-2.5 text-sm transition-colors flex items-center justify-center gap-2 mt-1"
             >
               {loading ? (
                 <>
@@ -197,9 +220,7 @@ export default function SignupPage() {
                   </svg>
                   Creating account…
                 </>
-              ) : (
-                "Create account"
-              )}
+              ) : "Create account"}
             </button>
           </form>
 
@@ -210,9 +231,7 @@ export default function SignupPage() {
 
         <p className="text-center text-sm text-gray-500 mt-5">
           Already have an account?{" "}
-          <a href="/login" className="text-green-400 hover:text-green-300 transition-colors">
-            Sign in
-          </a>
+          <a href="/login" className="text-green-400 hover:text-green-300 transition-colors">Sign in</a>
         </p>
       </div>
     </div>
