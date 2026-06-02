@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, FormEvent } from "react";
 import { Music, CheckCircle } from "lucide-react";
+import GoogleOAuthButton from "@/app/_components/shared/GoogleOAuthButton";
 
 export default function SignupPage() {
   const [firstName, setFirstName] = useState("");
@@ -100,6 +101,16 @@ export default function SignupPage() {
               {error}
             </div>
           )}
+
+          {/* Google OAuth */}
+          <GoogleOAuthButton onError={setError} />
+
+          {/* Divider */}
+          <div className="flex items-center gap-3">
+            <div className="flex-1 h-px bg-white/10" />
+            <span className="text-gray-600 text-xs">or sign up with email</span>
+            <div className="flex-1 h-px bg-white/10" />
+          </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-3">

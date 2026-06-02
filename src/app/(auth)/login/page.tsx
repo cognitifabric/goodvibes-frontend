@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, FormEvent } from "react";
 import { Music } from "lucide-react";
+import GoogleOAuthButton from "@/app/_components/shared/GoogleOAuthButton";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -33,7 +34,6 @@ export default function LoginPage() {
         return;
       }
 
-      // Redirect to dashboard on success
       const params = new URLSearchParams(window.location.search);
       const next = params.get("next") || "/dashboard";
       window.location.href = next;
@@ -49,7 +49,6 @@ export default function LoginPage() {
       className="min-h-screen flex items-center justify-center px-4"
       style={{ background: "var(--background)" }}
     >
-      {/* Ambient glow */}
       <div
         className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 rounded-full blur-3xl opacity-10 pointer-events-none"
         style={{ background: "var(--color-primary)" }}
@@ -75,6 +74,16 @@ export default function LoginPage() {
               {error}
             </div>
           )}
+
+          {/* Google OAuth */}
+          <GoogleOAuthButton onError={setError} />
+
+          {/* Divider */}
+          <div className="flex items-center gap-3">
+            <div className="flex-1 h-px bg-white/10" />
+            <span className="text-gray-600 text-xs">or continue with email</span>
+            <div className="flex-1 h-px bg-white/10" />
+          </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -129,9 +138,7 @@ export default function LoginPage() {
                   </svg>
                   Signing in…
                 </>
-              ) : (
-                "Sign in"
-              )}
+              ) : "Sign in"}
             </button>
           </form>
         </div>
