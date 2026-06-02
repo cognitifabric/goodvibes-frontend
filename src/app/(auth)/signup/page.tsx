@@ -2,6 +2,7 @@
 import React, { useState, FormEvent } from "react";
 import { Music, CheckCircle } from "lucide-react";
 import GoogleOAuthButton from "@/app/_components/shared/GoogleOAuthButton";
+import SpotifyLoginButton from "@/app/_components/shared/SpotifyLoginButton";
 
 export default function SignupPage() {
   const [firstName, setFirstName] = useState("");
@@ -101,6 +102,9 @@ export default function SignupPage() {
               {error}
             </div>
           )}
+
+          {/* Spotify signup */}
+          <SpotifyLoginButton label="Sign up with Spotify" />
 
           {/* Google OAuth */}
           <GoogleOAuthButton onError={setError} />
