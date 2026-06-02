@@ -21,7 +21,12 @@ export default function LoginPage() {
       profile_fetch_failed: "Could not load Spotify profile. Please try again.",
       login_failed: "Login failed. Please try again.",
     };
-    return msgs[e] ?? decodeURIComponent(e);
+    const decoded = decodeURIComponent(e);
+    // Sanitize raw server/validation errors so they don't leak technical details
+    if (decoded.includes("validation failed") || decoded.includes("Path `")) {
+      return "Sign-in failed. Please try again or use a different method.";
+    }
+    return msgs[e] ?? decoded;
   });
 
   async function handleSubmit(e: FormEvent) {
